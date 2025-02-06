@@ -2370,7 +2370,7 @@ func (b *LocalBackend) Start(opts ipn.Options) error {
 
 // addServiceIPs adds the IP addresses of any VIP Services sent from the
 // coordination server to the list of addresses that we expect to handle.
-func addServiceIPs(localNetsB *netipx.IPSetBuilder, selfNode tailcfg.NodeView) error {
+func addServiceIPs(localNetsB *netipx.IPSetBuilder, selfNode tailcfg.NodeView, l logger.Logf) error {
 	if !selfNode.Valid() {
 		return nil
 	}
@@ -2383,6 +2383,7 @@ func addServiceIPs(localNetsB *netipx.IPSetBuilder, selfNode tailcfg.NodeView) e
 	for _, sm := range serviceMap { // typically there will be exactly one of these
 		for _, serviceAddrs := range sm {
 			for _, addr := range serviceAddrs { // typically there will be exactly two of these
+				l("adding service IP %v", addr)
 				localNetsB.Add(addr)
 			}
 		}
@@ -2435,7 +2436,8 @@ func (b *LocalBackend) updateFilterLocked(netMap *netmap.NetworkMap, prefs ipn.P
 			b.health.SetHealthy(invalidPacketFilterWarnable)
 		}
 
-		if err := addServiceIPs(&localNetsB, netMap.SelfNode); err != nil {
+		b.logf("checking for service IPs")
+		if err := addServiceIPs(&localNetsB, netMap.SelfNode, b.logf); err != nil {
 			b.logf("addServiceIPs: %v", err)
 		}
 	}

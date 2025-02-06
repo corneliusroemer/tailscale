@@ -163,28 +163,29 @@ func (a *IngressReconciler) maybeProvision(ctx context.Context, logger *zap.Suga
 		a.recorder.Event(ing, corev1.EventTypeWarning, "HTTPSNotEnabled", "HTTPS is not enabled on the tailnet; ingress may not work")
 	}
 
-	// magic443 is a fake hostname that we can use to tell containerboot to swap
+	// magic80 is a fake hostname that we can use to tell containerboot to swap
 	// out with the real hostname once it's known.
-	const magic443 = "${TS_CERT_DOMAIN}:443"
+	const magic80 = "${TS_CERT_DOMAIN}:80"
 	sc := &ipn.ServeConfig{
 		TCP: map[uint16]*ipn.TCPPortHandler{
-			443: {
-				HTTPS: true,
+			80: {
+				HTTPS: false,
+				HTTP:  true,
 			},
 		},
 		Web: map[ipn.HostPort]*ipn.WebServerConfig{
-			magic443: {
+			magic80: {
 				Handlers: map[string]*ipn.HTTPHandler{},
 			},
 		},
 	}
 	if opt.Bool(ing.Annotations[AnnotationFunnel]).EqualBool(true) {
 		sc.AllowFunnel = map[ipn.HostPort]bool{
-			magic443: true,
+			magic80: true,
 		}
 	}
 
-	web := sc.Web[magic443]
+	web := sc.Web[magic80]
 
 	var tlsHost string // hostname or FQDN or empty
 	if ing.Spec.TLS != nil && len(ing.Spec.TLS) > 0 && len(ing.Spec.TLS[0].Hosts) > 0 {
@@ -248,7 +249,7 @@ func (a *IngressReconciler) maybeProvision(ctx context.Context, logger *zap.Suga
 			Ports: []networkingv1.IngressPortStatus{
 				{
 					Protocol: "TCP",
-					Port:     443,
+					Port:     80,
 				},
 			},
 		},
@@ -323,7 +324,7 @@ func handlersForIngress(ctx context.Context, ing *networkingv1.Ingress, cl clien
 			return
 		}
 		proto := "http://"
-		if port == 443 || b.Service.Port.Name == "https" {
+		if port == 443 && b.Service.Port.Name == "https" {
 			proto = "https+insecure://"
 		}
 		mak.Set(&handlers, path, &ipn.HTTPHandler{
